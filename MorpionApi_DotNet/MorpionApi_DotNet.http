@@ -1,0 +1,20 @@
+@MorpionApi_DotNet_HostAddress = http://localhost:5056
+
+POST {{MorpionApi_DotNet_HostAddress}}/api/morpion/games
+Accept: application/json
+
+###
+
+POST {{MorpionApi_DotNet_HostAddress}}/api/morpion/games/current/moves
+Content-Type: application/json
+
+{
+  "index": 0
+}
+
+###
+
+GET {{MorpionApi_DotNet_HostAddress}}/api/morpion/games/current
+Accept: application/json
+
+###

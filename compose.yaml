@@ -1,0 +1,7 @@
+﻿services:
+  morpionapi_dotnet:
+    image: morpionapi_dotnet
+    build:
+      context: .
+      dockerfile: MorpionApi_DotNet/Dockerfile
+
