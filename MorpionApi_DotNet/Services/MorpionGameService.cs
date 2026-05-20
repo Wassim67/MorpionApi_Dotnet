@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using MorpionApi_DotNet.Data;
+using MorpionApi_DotNet.Entities;
 using MorpionApi_DotNet.Models;
 using MorpionApi_DotNet.Players;
 
@@ -7,6 +10,7 @@ public class MorpionGameService
 {
     private const string HumanPlayer = "X";
     private const string BotPlayer = "O";
+    private const char EmptyCell = '-';
 
     private static readonly int[][] WinningCombinations =
     [
@@ -21,83 +25,98 @@ public class MorpionGameService
     ];
 
     private readonly IBotPlayer _botPlayer;
-    private readonly object _syncRoot = new();
-    private string[]? _cells;
-    private bool _isGameOver;
-    private int _movesCount;
-    private string _statusMessage = "Ton tour (X)";
+    private readonly AppDbContext _dbContext;
 
-    public MorpionGameService(IBotPlayer botPlayer)
+    public MorpionGameService(IBotPlayer botPlayer, AppDbContext dbContext)
     {
         _botPlayer = botPlayer;
+        _dbContext = dbContext;
     }
 
-    public GameDto CreateGame()
+    public async Task<GameDto> CreateGameAsync(string userId, CancellationToken cancellationToken = default)
     {
-        lock (_syncRoot)
+        var game = new GameEntity
         {
-            _cells = Enumerable.Repeat(string.Empty, 9).ToArray();
-            _isGameOver = false;
-            _movesCount = 0;
-            _statusMessage = "Ton tour (X)";
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Board = new string(EmptyCell, 9),
+            IsGameOver = false,
+            MovesCount = 0,
+            StatusMessage = "Ton tour (X)",
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
 
-            return ToDto();
-        }
+        _dbContext.Games.Add(game);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToDto(game);
     }
 
-    public GameDto? GetCurrentGame()
+    public async Task<GameDto?> GetCurrentGameAsync(string userId, CancellationToken cancellationToken = default)
     {
-        lock (_syncRoot)
+        var game = await GetCurrentGameEntityAsync(userId, cancellationToken);
+        return game is null ? null : ToDto(game);
+    }
+
+    public async Task<PlayMoveResult> PlayMoveAsync(
+        string userId,
+        int index,
+        CancellationToken cancellationToken = default)
+    {
+        var game = await GetCurrentGameEntityAsync(userId, cancellationToken);
+        if (game is null)
         {
-            return _cells is null ? null : ToDto();
+            await CreateGameAsync(userId, cancellationToken);
+            game = await GetCurrentGameEntityAsync(userId, cancellationToken)
+                ?? throw new InvalidOperationException("La partie n'a pas pu etre creee.");
         }
-    }
 
-    public PlayMoveResult PlayMove(int index)
-    {
-        lock (_syncRoot)
+        if (index is < 0 or > 8)
         {
-            if (_cells is null)
-            {
-                CreateGame();
-            }
-
-            if (index is < 0 or > 8)
-            {
-                return PlayMoveResult.Fail(
-                    "L'index doit être compris entre 0 et 8.",
-                    StatusCodes.Status400BadRequest);
-            }
-
-            if (_isGameOver)
-            {
-                return PlayMoveResult.Fail(
-                    "La partie est déjà terminée. Crée une nouvelle partie.",
-                    StatusCodes.Status409Conflict);
-            }
-
-            if (!string.IsNullOrEmpty(_cells![index]))
-            {
-                return PlayMoveResult.Fail(
-                    "Cette case est déjà jouée.",
-                    StatusCodes.Status409Conflict);
-            }
-
-            ApplyMove(index, HumanPlayer);
-            if (TryEndGame(HumanPlayer))
-            {
-                return PlayMoveResult.Ok(ToDto());
-            }
-
-            PlayBotTurn();
-
-            return PlayMoveResult.Ok(ToDto());
+            return PlayMoveResult.Fail(
+                "L'index doit etre compris entre 0 et 8.",
+                StatusCodes.Status400BadRequest);
         }
+
+        if (game.IsGameOver)
+        {
+            return PlayMoveResult.Fail(
+                "La partie est deja terminee. Cree une nouvelle partie.",
+                StatusCodes.Status409Conflict);
+        }
+
+        var cells = ToCells(game.Board);
+        if (!string.IsNullOrEmpty(cells[index]))
+        {
+            return PlayMoveResult.Fail(
+                "Cette case est deja jouee.",
+                StatusCodes.Status409Conflict);
+        }
+
+        ApplyMove(game, cells, index, HumanPlayer);
+        if (!TryEndGame(game, cells, HumanPlayer))
+        {
+            PlayBotTurn(game, cells);
+        }
+
+        game.Board = ToBoard(cells);
+        game.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return PlayMoveResult.Ok(ToDto(game));
     }
 
-    private void PlayBotTurn()
+    private async Task<GameEntity?> GetCurrentGameEntityAsync(string userId, CancellationToken cancellationToken)
     {
-        var cells = _cells ?? throw new InvalidOperationException("Aucune partie en cours.");
+        return await _dbContext.Games
+            .Where(game => game.UserId == userId)
+            .OrderByDescending(game => game.UpdatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private void PlayBotTurn(GameEntity game, string[] cells)
+    {
         var botMoveIndex = _botPlayer.GetNextMoveIndex(cells);
         if (botMoveIndex is null ||
             botMoveIndex < 0 ||
@@ -115,46 +134,46 @@ public class MorpionGameService
             }
         }
 
-        ApplyMove(botMoveIndex.Value, BotPlayer);
+        ApplyMove(game, cells, botMoveIndex.Value, BotPlayer);
 
-        if (!TryEndGame(BotPlayer))
+        if (!TryEndGame(game, cells, BotPlayer))
         {
-            _statusMessage = "Ton tour (X)";
+            game.StatusMessage = "Ton tour (X)";
         }
     }
 
-    private void ApplyMove(int index, string player)
+    private static void ApplyMove(GameEntity game, string[] cells, int index, string player)
     {
-        _cells![index] = player;
-        _movesCount++;
+        cells[index] = player;
+        game.MovesCount++;
     }
 
-    private bool TryEndGame(string player)
+    private static bool TryEndGame(GameEntity game, string[] cells, string player)
     {
-        if (HasWinner(player))
+        if (HasWinner(cells, player))
         {
-            _isGameOver = true;
-            _statusMessage = player == HumanPlayer ? "Tu as gagné !" : "Le bot a gagné.";
+            game.IsGameOver = true;
+            game.StatusMessage = player == HumanPlayer ? "Tu as gagne !" : "Le bot a gagne.";
             return true;
         }
 
-        if (_movesCount == 9)
+        if (game.MovesCount == 9)
         {
-            _isGameOver = true;
-            _statusMessage = "Match nul.";
+            game.IsGameOver = true;
+            game.StatusMessage = "Match nul.";
             return true;
         }
 
         return false;
     }
 
-    private bool HasWinner(string player)
+    private static bool HasWinner(string[] cells, string player)
     {
         foreach (var combo in WinningCombinations)
         {
-            if (_cells![combo[0]] == player &&
-                _cells[combo[1]] == player &&
-                _cells[combo[2]] == player)
+            if (cells[combo[0]] == player &&
+                cells[combo[1]] == player &&
+                cells[combo[2]] == player)
             {
                 return true;
             }
@@ -163,15 +182,27 @@ public class MorpionGameService
         return false;
     }
 
-    private GameDto ToDto()
+    private static GameDto ToDto(GameEntity game)
     {
         return new GameDto
         {
-            Board = _cells!.ToArray(),
-            CurrentPlayer = _isGameOver ? string.Empty : HumanPlayer,
-            IsGameOver = _isGameOver,
-            MovesCount = _movesCount,
-            StatusMessage = _statusMessage
+            Board = ToCells(game.Board),
+            CurrentPlayer = game.IsGameOver ? string.Empty : HumanPlayer,
+            IsGameOver = game.IsGameOver,
+            MovesCount = game.MovesCount,
+            StatusMessage = game.StatusMessage
         };
+    }
+
+    private static string[] ToCells(string board)
+    {
+        return board
+            .Select(cell => cell == EmptyCell ? string.Empty : cell.ToString())
+            .ToArray();
+    }
+
+    private static string ToBoard(string[] cells)
+    {
+        return string.Concat(cells.Select(cell => string.IsNullOrEmpty(cell) ? EmptyCell : cell[0]));
     }
 }

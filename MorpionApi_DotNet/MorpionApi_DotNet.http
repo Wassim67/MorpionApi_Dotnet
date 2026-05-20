@@ -1,12 +1,35 @@
 @MorpionApi_DotNet_HostAddress = http://localhost:5056
+@AccessToken = coller_le_token_ici
+
+POST {{MorpionApi_DotNet_HostAddress}}/auth/access-token
+Content-Type: application/json
+
+{
+  "email": "player1@test.local",
+  "password": "Password123"
+}
+
+###
+
+PUT {{MorpionApi_DotNet_HostAddress}}/auth/access-token
+Content-Type: application/json
+
+{
+  "email": "player1@test.local",
+  "password": "Password123"
+}
+
+###
 
 POST {{MorpionApi_DotNet_HostAddress}}/api/morpion/games
 Accept: application/json
+Authorization: Bearer {{AccessToken}}
 
 ###
 
 POST {{MorpionApi_DotNet_HostAddress}}/api/morpion/games/current/moves
 Content-Type: application/json
+Authorization: Bearer {{AccessToken}}
 
 {
   "index": 0
@@ -16,5 +39,6 @@ Content-Type: application/json
 
 GET {{MorpionApi_DotNet_HostAddress}}/api/morpion/games/current
 Accept: application/json
+Authorization: Bearer {{AccessToken}}
 
 ###

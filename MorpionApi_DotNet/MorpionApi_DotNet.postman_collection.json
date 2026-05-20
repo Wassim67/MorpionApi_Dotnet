@@ -1,104 +1,266 @@
 {
   "info": {
     "_postman_id": "0d1f90e7-8a47-4e4b-a4d3-4fd2d5a3b3b5",
-    "name": "Morpion API",
-    "description": "Collection Postman pour tester l'API Morpion : creation d'une partie, jouer un coup, recuperer la partie en cours.",
+    "name": "Morpion API - TD2 Auth",
+    "description": "Collection Postman pour tester le TD2 : register, login JWT, routes Morpion protegees et partie filtree par utilisateur.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:5056"
+    },
+    {
+      "key": "email",
+      "value": "player1@test.local"
+    },
+    {
+      "key": "password",
+      "value": "Password123"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
     }
   ],
   "item": [
     {
-      "name": "Creer une partie",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Accept",
-            "value": "application/json"
-          }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/api/morpion/games",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "morpion",
-            "games"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "Jouer un coup",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          },
-          {
-            "key": "Accept",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"index\": 0\n}",
-          "options": {
-            "raw": {
-              "language": "json"
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register - creer un utilisateur et recuperer un JWT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
             }
-          }
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/morpion/games/current/moves",
-          "host": [
-            "{{baseUrl}}"
           ],
-          "path": [
-            "api",
-            "morpion",
-            "games",
-            "current",
-            "moves"
-          ]
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/access-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "access-token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login - recuperer un JWT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/access-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "access-token"
+              ]
+            }
+          },
+          "response": []
         }
-      },
-      "response": []
+      ]
     },
     {
-      "name": "Recuperer la partie en cours",
-      "request": {
-        "method": "GET",
-        "header": [
+      "name": "Morpion",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
           {
-            "key": "Accept",
-            "value": "application/json"
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
           }
-        ],
-        "url": {
-          "raw": "{{baseUrl}}/api/morpion/games/current",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "api",
-            "morpion",
-            "games",
-            "current"
-          ]
-        }
+        ]
       },
-      "response": []
+      "item": [
+        {
+          "name": "Creer une partie",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/morpion/games",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "morpion",
+                "games"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Jouer un coup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"index\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/morpion/games/current/moves",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "morpion",
+                "games",
+                "current",
+                "moves"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Recuperer la partie en cours",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/morpion/games/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "morpion",
+                "games",
+                "current"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Controle securite",
+      "item": [
+        {
+          "name": "Morpion sans JWT - doit retourner 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/morpion/games/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "morpion",
+                "games",
+                "current"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
