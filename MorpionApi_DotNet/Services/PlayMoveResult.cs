@@ -7,22 +7,25 @@ public class PlayMoveResult
     public bool Success { get; init; }
     public GameDto? Game { get; init; }
     public string? Error { get; init; }
+    public int StatusCode { get; init; }
 
     public static PlayMoveResult Ok(GameDto game)
     {
         return new PlayMoveResult
         {
             Success = true,
-            Game = game
+            Game = game,
+            StatusCode = StatusCodes.Status200OK
         };
     }
 
-    public static PlayMoveResult Fail(string error)
+    public static PlayMoveResult Fail(string error, int statusCode)
     {
         return new PlayMoveResult
         {
             Success = false,
-            Error = error
+            Error = error,
+            StatusCode = statusCode
         };
     }
 }

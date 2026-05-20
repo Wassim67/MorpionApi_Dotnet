@@ -64,17 +64,23 @@ public class MorpionGameService
 
             if (index is < 0 or > 8)
             {
-                return PlayMoveResult.Fail("L'index doit etre compris entre 0 et 8.");
+                return PlayMoveResult.Fail(
+                    "L'index doit être compris entre 0 et 8.",
+                    StatusCodes.Status400BadRequest);
             }
 
             if (_isGameOver)
             {
-                return PlayMoveResult.Fail("La partie est deja terminee. Cree une nouvelle partie.");
+                return PlayMoveResult.Fail(
+                    "La partie est déjà terminée. Crée une nouvelle partie.",
+                    StatusCodes.Status409Conflict);
             }
 
             if (!string.IsNullOrEmpty(_cells![index]))
             {
-                return PlayMoveResult.Fail("Cette case est deja jouee.");
+                return PlayMoveResult.Fail(
+                    "Cette case est déjà jouée.",
+                    StatusCodes.Status409Conflict);
             }
 
             ApplyMove(index, HumanPlayer);
@@ -128,7 +134,7 @@ public class MorpionGameService
         if (HasWinner(player))
         {
             _isGameOver = true;
-            _statusMessage = player == HumanPlayer ? "Tu as gagne !" : "Le bot a gagne.";
+            _statusMessage = player == HumanPlayer ? "Tu as gagné !" : "Le bot a gagné.";
             return true;
         }
 

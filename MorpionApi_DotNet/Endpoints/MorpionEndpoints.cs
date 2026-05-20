@@ -15,7 +15,10 @@ public static class MorpionEndpoints
         morpion.MapGet("/games/current", (MorpionGameService gameService) =>
             gameService.GetCurrentGame() is { } game
                 ? Results.Ok(game)
-                : Results.NotFound(new { message = "Aucune partie en cours." }));
+                : Results.Problem(
+                    title: "Partie introuvable",
+                    detail: "Aucune partie en cours.",
+                    statusCode: StatusCodes.Status404NotFound));
 
         morpion.MapPost("/games/current/moves", (PlayMoveRequest request, MorpionGameService gameService) =>
         {
@@ -23,7 +26,10 @@ public static class MorpionEndpoints
 
             return result.Success
                 ? Results.Ok(result.Game)
-                : Results.BadRequest(new { message = result.Error });
+                : Results.Problem(
+                    title: "Coup refusé",
+                    detail: result.Error,
+                    statusCode: result.StatusCode);
         });
 
         return app;
